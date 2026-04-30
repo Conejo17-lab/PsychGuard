@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isEmailVerified() { return request.auth.token.email_verified == true; }
+    function getUserData() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function isRole(role) { return isSignedIn() && getUserData().role == role; }
+    function isAdmin() { return isRole('admin'); }
+    function isPsychologist() { return isRole('psychologist'); }
+    function isPatient() { return isRole('patient'); }
+    
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // --- Validations ---
+    function isValidPsychologist(data) {
+      return data.keys().hasAll(['name', 'email']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.email is string && data.email.size() <= 100;
+    }
+
+    function isValidPatient(data) {
+      return data.keys().hasAll(['name', 'email']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.email is string && data.email.size() <= 100;
+    }
+
+    function isValidSession(data) {
+      return data.keys().hasAll(['patientId', 'psychologistId', 'startTime', 'status']) &&
+             isValidId(data.patientId) &&
+             isValidId(data.psychologistId) &&
+             data.status in ['scheduled', 'in-progress', 'completed', 'cancelled'];
+    }
+
+    function isValidFeedback(data) {
+      return data.keys().hasAll(['sessionId', 'patientId', 'moodBefore', 'moodAfter', 'complaints']) &&
+             isValidId(data.sessionId) &&
+             isValidId(data.patientId);
+    }
+
+    // --- Rules ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId && incoming().role == 'patient'; // Only patients can self-register as patients
+      allow update: if isAdmin() || (isSignedIn() && request.auth.uid == userId && incoming().role == existing().role);
+    }
+
+    match /psychologists/{psychId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /patients/{patId} {
+      allow read: if isAdmin() || isPsychologist() || (isPatient() && request.auth.uid == patId);
+      allow write: if isAdmin() || isPsychologist();
+    }
+
+    match /sessions/{sessionId} {
+      allow get: if isSignedIn() && (isAdmin() || getUserData().role in ['psychologist', 'patient']);
+      allow list: if isSignedIn() && (isAdmin() || (isPsychologist() && resource.data.psychologistId == request.auth.uid) || (isPatient() && resource.data.patientId == request.auth.uid));
+      allow create: if (isAdmin() || isPsychologist()) && isValidSession(incoming());
+      allow update: if (isAdmin() || isPsychologist()) && isValidSession(incoming());
+    }
+
+    match /feedbacks/{feedbackId} {
+      allow get: if isSignedIn() && (isAdmin() || isPsychologist() || (isPatient() && resource.data.patientId == request.auth.uid));
+      allow list: if isSignedIn() && (isAdmin() || (isPsychologist() && resource.data.psychologistId == request.auth.uid) || (isPatient() && resource.data.patientId == request.auth.uid));
+      allow create: if isPatient() && request.auth.uid == incoming().patientId && isValidFeedback(incoming());
+    }
+  }
+}

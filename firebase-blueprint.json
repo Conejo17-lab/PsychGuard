@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "Psychologist": {
+      "title": "Psychologist",
+      "description": "Professional providing care in the clinic",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "specialization": { "type": "string" },
+        "bio": { "type": "string" },
+        "assignedPatientIds": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["name", "email"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "User receiving care",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "birthDate": { "type": "string" },
+        "psychologistId": { "type": "string" }
+      },
+      "required": ["name", "email"]
+    },
+    "Session": {
+      "title": "Consultation Session",
+      "description": "Record of a clinical meeting",
+      "type": "object",
+      "properties": {
+        "patientId": { "type": "string" },
+        "psychologistId": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["scheduled", "in-progress", "completed", "cancelled"] }
+      },
+      "required": ["patientId", "psychologistId", "startTime"]
+    },
+    "Feedback": {
+      "title": "Session Feedback",
+      "description": "Patient's emotional state and complaints regarding a session",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "patientId": { "type": "string" },
+        "moodBefore": { "type": "string" },
+        "moodAfter": { "type": "string" },
+        "complaints": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["sessionId", "patientId"]
+    }
+  },
+  "firestore": {
+    "psychologists": {
+      "schema": "Psychologist",
+      "description": "Collection of psychologists"
+    },
+    "patients": {
+      "schema": "Patient",
+      "description": "Collection of patients"
+    },
+    "sessions": {
+      "schema": "Session",
+      "description": "Collection of clinical sessions"
+    },
+    "feedbacks": {
+      "schema": "Feedback",
+      "description": "Collection of patient feedbacks"
+    },
+    "users": {
+        "schema": {
+            "type": "object",
+            "properties": {
+                "role": { "type": "string", "enum": ["admin", "psychologist", "patient"] },
+                "name": { "type": "string" },
+                "email": { "type": "string" }
+            },
+            "required": ["role", "email"]
+        },
+        "description": "Unified user collection with roles"
+    }
+  }
+}
