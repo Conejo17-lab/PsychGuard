@@ -1,21 +1,53 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<module type="PYTHON_MODULE" version="4">
-  <component name="NewModuleRootManager">
-    <content url="file://$MODULE_DIR$">
-      
-      <!-- Diretórios de código -->
-      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false"/>
-      <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true"/>
-      
-      <!-- Ignorar ambientes virtuais -->
-      <excludeFolder url="file://$MODULE_DIR$/venv"/>
-      <excludeFolder url="file://$MODULE_DIR$/.venv"/>
-      <excludeFolder url="file://$MODULE_DIR$/__pycache__"/>
-      
-    </content>
+name: Deploy Vite React App to GitHub Pages
 
-    <!-- Python SDK -->
-    <orderEntry type="jdk" jdkName="Python 3.10" jdkType="Python SDK"/>
-    <orderEntry type="sourceFolder" forTests="false"/>
-  </component>
-</module>
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm install
+
+      - name: ⚙️ Build project
+        run: npm run build
+
+      - name: 📤 Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: 🚀 Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
